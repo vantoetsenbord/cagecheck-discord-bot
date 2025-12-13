@@ -1,0 +1,10 @@
+export const cfg = {
+  KEYHOLDER_ROLE_ID: process.env.KEYHOLDER_ROLE_ID!,
+  CAGEDSUB_ROLE_ID: process.env.CAGEDSUB_ROLE_ID!,
+  CAGECHECK_CHANNEL_ID: process.env.CAGECHECK_CHANNEL_ID!,
+  LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID!,
+  MIN_DURATION_MIN: Number(process.env.MIN_DURATION_MIN ?? 10),
+  MAX_DURATION_MIN: Number(process.env.MAX_DURATION_MIN ?? 1440),
+  PROOF_LIFETIME_HOURS: Number(process.env.PROOF_LIFETIME_HOURS ?? 24),
+  RECORD_RETENTION_DAYS: Number(process.env.RECORD_RETENTION_DAYS ?? 60),
+};
