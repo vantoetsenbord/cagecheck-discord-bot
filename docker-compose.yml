@@ -4,8 +4,20 @@ services:
     build: .
     container_name: cagecheck-bot
     restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      APPLICATION_ID: ${APPLICATION_ID}
+      GUILD_ID: ${GUILD_ID}
+      KEYHOLDER_ROLE_ID: ${KEYHOLDER_ROLE_ID}
+      KEYMASTER_ROLE_ID: ${KEYMASTER_ROLE_ID}
+      CAGEDSUB_ROLE_ID: ${CAGEDSUB_ROLE_ID}
+      CAGECHECK_CHANNEL_ID: ${CAGECHECK_CHANNEL_ID}
+      LOG_CHANNEL_ID: ${LOG_CHANNEL_ID}
+      REQUEST_ALL_SPREAD_MIN: ${REQUEST_ALL_SPREAD_MIN:-2}
+      MIN_DURATION_MIN: ${MIN_DURATION_MIN:-10}
+      MAX_DURATION_MIN: ${MAX_DURATION_MIN:-1440}
+      PROOF_LIFETIME_HOURS: ${PROOF_LIFETIME_HOURS:-24}
+      RECORD_RETENTION_DAYS: ${RECORD_RETENTION_DAYS:-60}
     volumes:
       - cagecheck-data:/app/data
 

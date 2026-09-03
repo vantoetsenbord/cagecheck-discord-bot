@@ -33,6 +33,6 @@ Use the bot token from the Bot page for `DISCORD_TOKEN`; do not use the client s
 
 ## Docker / Portainer
 
-GitHub Actions publishes `ghcr.io/vantoetsenbord/cagecheck-discord-bot:latest` whenever `main` changes. The Compose stack can pull that image (or build locally) and stores `data/*.json` in the persistent `cagecheck-data` volume. Place `.env` beside `docker-compose.yml`, then deploy the stack with Portainer or run `docker compose up -d --build`.
+GitHub Actions publishes `ghcr.io/vantoetsenbord/cagecheck-discord-bot:latest` whenever `main` changes. The Compose stack can pull that image (or build locally) and stores `data/*.json` in the persistent `cagecheck-data` volume. In Portainer, add the required values under **Environment variables**. For local Docker Compose, place `.env` beside `docker-compose.yml`, then run `docker compose up -d --build`.
 
 Register commands once from a trusted machine with the same `.env` by running `npm run register`. The running container does not re-register commands on every restart.
