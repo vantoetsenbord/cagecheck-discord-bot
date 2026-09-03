@@ -226,4 +226,7 @@ setInterval(() => {
 }, 24 * 60 * 60 * 1000);
 
 // ---------- login ----------
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN).catch((error) => {
+  console.error("Discord login failed. Check DISCORD_TOKEN and network access:", error);
+  process.exit(1);
+});

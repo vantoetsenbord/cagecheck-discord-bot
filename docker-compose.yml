@@ -1,0 +1,13 @@
+services:
+  cagecheck-bot:
+    image: ghcr.io/vantoetsenbord/cagecheck-discord-bot:latest
+    build: .
+    container_name: cagecheck-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - cagecheck-data:/app/data
+
+volumes:
+  cagecheck-data:

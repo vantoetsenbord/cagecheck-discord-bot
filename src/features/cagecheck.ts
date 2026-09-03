@@ -7,6 +7,11 @@ import {
   EmbedBuilder,
   Attachment,
   GuildMemberRoleManager,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  Message,
   TextChannel,
   ForumChannel,
   ThreadChannel,
@@ -97,6 +102,18 @@ export const cagecheckCommand = new SlashCommandBuilder()
       .setDescription("Keyholders: reset consecutive misses to 0")
       .addUserOption((o) => o.setName("sub").setDescription("Target sub").setRequired(true))
   )
+    .addSubcommand((sc) =>
+      sc
+        .setName("request-all")
+        .setDescription("Keyholder: request a check from all CagedSubs")
+        .addIntegerOption((o) =>
+          o
+            .setName("duration")
+            .setDescription(`Deadline in minutes (${cfg.MIN_DURATION_MIN}–${cfg.MAX_DURATION_MIN})`)
+            .setRequired(true)
+        )
+        .addStringOption((o) => o.setName("reason").setDescription("Reason/context").setRequired(false))
+    )
   .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
   .toJSON();
 
@@ -109,7 +126,7 @@ export async function handleCagecheck(inter: ChatInputCommandInteraction) {
     /* ===== /cagecheck request ===== */
     if (sub === "request") {
       try {
-        requireRole(inter, cfg.KEYHOLDER_ROLE_ID, "Keyholder");
+        requireRole(inter, cfg.KEYMASTER_ROLE_ID, "Keymaster");
       } catch (e: any) {
         await inter.editReply({ content: e.message });
         return;
@@ -366,6 +383,203 @@ export async function handleCagecheck(inter: ChatInputCommandInteraction) {
         st.consecutiveMisses = 0;
         DB.updateSubState(st);
       }
+      return;
+    }
+
+    /* ===== /cagecheck request-all ===== */
+    if (sub === "request-all") {
+      try {
+        requireRole(inter, cfg.KEYHOLDER_ROLE_ID, "Keyholder");
+      } catch (e: any) {
+        await inter.editReply({ content: e.message });
+        return;
+      }
+
+      const duration = inter.options.getInteger("duration", true);
+      const reason = inter.options.getString("reason") ?? undefined;
+
+      if (duration < cfg.MIN_DURATION_MIN || duration > cfg.MAX_DURATION_MIN) {
+        await inter.editReply({
+          content: `Duration must be between ${cfg.MIN_DURATION_MIN} and ${cfg.MAX_DURATION_MIN} minutes.`,
+        });
+        return;
+      }
+
+      // fetch guild and ensure we can list members
+      const guild = inter.guild!;
+      await guild.members.fetch(); // ensure cache populated
+
+      // gather caged subs
+      const members = guild.members.cache.filter((m) => m.roles.cache.has(cfg.CAGEDSUB_ROLE_ID));
+      if (!members.size) {
+        await inter.editReply({ content: "No members with the CagedSub role were found." });
+        return;
+      }
+
+  // preview info for confirmation
+  const totalCaged = members.size;
+
+      const uid = `${inter.user.id}-${Date.now()}`;
+      const confirmId = `request-all:confirm:${uid}`;
+      const cancelId = `request-all:cancel:${uid}`;
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(confirmId).setLabel("Confirm").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+      );
+
+      await inter.editReply({ content: `You're about to request checks for ${totalCaged} CagedSubs. Confirm?`, components: [row] });
+
+      const replyMsg = (await inter.fetchReply()) as Message;
+
+      const collector = replyMsg.createMessageComponentCollector({
+        filter: (i) => i.user.id === inter.user.id,
+        componentType: ComponentType.Button,
+        time: 60_000,
+        max: 1,
+      });
+
+      collector.on("collect", async (btn) => {
+        try {
+          if (btn.customId === cancelId) {
+            await btn.update({ content: "Cancelled mass request.", components: [] });
+            return;
+          }
+
+          // acknowledge and clear components while processing
+          await btn.update({ content: "Processing mass request...", components: [] });
+
+          // now run the creation logic (same as before)
+          const checks = DB.getAllChecks();
+          const created: string[] = [];
+          const skipped: string[] = [];
+
+          // fetch raw channel once
+          const raw = await guild.channels.fetch(cfg.CAGECHECK_CHANNEL_ID).catch(() => null);
+          if (!raw) {
+            await inter.followUp({ content: "Configured #cage-check channel is invalid or I can't see it.", ephemeral: true });
+            return;
+          }
+
+          // helper: sleep for ms
+          const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+          const spreadMs = cfg.REQUEST_ALL_SPREAD_MIN * 60_000;
+          let processed = 0;
+          const progressInterval = Math.max(1, Math.floor(members.size / 10)); // update ~10 times
+
+          for (const [, member] of members) {
+            // skip if already has a pending check
+            const active = checks.find(
+              (c) => c.guildId === inter.guildId && c.targetId === member.id && c.status === "PENDING"
+            );
+            if (active) {
+              skipped.push(member.id);
+              continue;
+            }
+
+            let threadId: string | undefined;
+            // create thread/post depending on channel type
+            try {
+              if (raw.type === ChannelType.GuildText) {
+                const ch = raw as TextChannel;
+                const header = await ch.send(
+                  `⛓️ **Cage check** requested by ${userMention(inter.user.id)} for ${userMention(
+                    member.id
+                  )}.`
+                );
+                const thread = await header.startThread({
+                  name: `cage-${member.displayName ?? member.user.username}-${Date.now()}`,
+                  autoArchiveDuration: 60,
+                  reason: "Cage check thread",
+                });
+                threadId = thread.id;
+              } else if (raw.type === ChannelType.GuildForum) {
+                const forum = raw as ForumChannel;
+                const createdThread = await forum.threads.create({
+                  name: `cage-${member.displayName ?? member.user.username}-${Date.now()}`,
+                  autoArchiveDuration: 60,
+                  message: { content: `⛓️ **Cage check** requested by ${userMention(
+                    inter.user.id
+                  )} for ${userMention(member.id)}.` },
+                });
+                threadId = createdThread.id;
+              } else {
+                skipped.push(member.id);
+                continue;
+              }
+            } catch {
+              skipped.push(member.id);
+              continue;
+            }
+
+            if (!threadId) {
+              skipped.push(member.id);
+              continue;
+            }
+
+            const createdAt = Date.now();
+            const record: CageCheck = {
+              id: nanoid(10),
+              guildId: inter.guildId!,
+              requesterId: inter.user.id,
+              targetId: member.id,
+              reason,
+              createdAt,
+              dueAt: createdAt + duration * 60_000,
+              status: "PENDING",
+              threadId,
+            };
+
+            checks.push(record);
+            created.push(member.id);
+            processed += 1;
+
+            const thread = await guild.channels.fetch(threadId).catch(() => null);
+            if (thread?.isTextBased()) {
+              const embed = new EmbedBuilder()
+                .setTitle("Cage Check Requested")
+                .setDescription([
+                  `**Sub:** ${userMention(member.id)}`,
+                  `**Requested by:** ${userMention(inter.user.id)}`,
+                  `**Due:** <t:${Math.floor(record.dueAt / 1000)}:R>`,
+                  reason ? `**Reason:** ${reason}` : null,
+                ].filter(Boolean).join("\n"))
+                .setFooter({ text: `ID: ${record.id} • Use /cagecheck verify in this thread (one photo).` });
+              await thread.send({ content: userMention(member.id), embeds: [embed] }).catch(() => {});
+            }
+
+            // periodically persist and post progress
+            if (processed % progressInterval === 0) {
+              DB.setAllChecks(checks);
+              try {
+                await inter.followUp({ content: `Progress: created ${created.length}/${members.size} checks...`, ephemeral: true });
+              } catch {}
+            }
+
+            // wait a bit before the next creation to spread notifications
+            if (spreadMs > 0) await sleep(spreadMs);
+          }
+
+          DB.setAllChecks(checks);
+
+          const parts: string[] = [];
+          if (created.length) parts.push(`Created checks for ${created.length} members.`);
+          if (skipped.length) parts.push(`Skipped ${skipped.length} (already have active checks or failed).`);
+          if (!created.length && !skipped.length) parts.push("No checks created.");
+
+          await inter.followUp({ content: parts.join(" "), ephemeral: true });
+        } catch (err) {
+          console.error("request-all collect error:", err);
+          try { await inter.followUp({ content: "Error while processing mass request.", ephemeral: true }); } catch {}
+        }
+      });
+
+      collector.on("end", async (collected) => {
+        if (collected.size === 0) {
+          try { await inter.editReply({ content: "Confirmation timed out.", components: [] }); } catch {}
+        }
+      });
       return;
     }
 
