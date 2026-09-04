@@ -121,6 +121,11 @@ setInterval(async () => {
 
   for (const c of checks) {
     if (c.status === "PENDING" && now > c.dueAt) {
+      // Re-read this record before applying a strike. A verification may have
+      // completed after this scheduler loaded its initial snapshot.
+      const latest = DB.getAllChecks().find((check) => check.id === c.id);
+      if (!latest || latest.status !== "PENDING") continue;
+
       c.status = "LATE";
       c.verifiedAt = now;
       changed = true;

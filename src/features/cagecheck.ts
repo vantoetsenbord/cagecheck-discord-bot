@@ -303,11 +303,16 @@ export async function handleCagecheck(inter: ChatInputCommandInteraction) {
       }
 
       const checks = DB.getAllChecks();
-      const cc = checks.find(
+      const pendingChecks = checks.filter(
         (c) => c.guildId === inter.guildId && c.status === "PENDING" && c.targetId === inter.user.id
       );
+      const cc = pendingChecks.find((c) => c.threadId === inter.channelId);
       if (!cc) {
-        await inter.editReply({ content: "No active cage check found for you." });
+        await inter.editReply({
+          content: pendingChecks.length
+            ? "This is not the thread for your active cage check. Please verify in the request's own thread."
+            : "No active cage check found for you.",
+        });
         return;
       }
 
