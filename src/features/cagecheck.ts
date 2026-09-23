@@ -102,18 +102,6 @@ export const cagecheckCommand = new SlashCommandBuilder()
       .setDescription("Keyholders: reset consecutive misses to 0")
       .addUserOption((o) => o.setName("sub").setDescription("Target sub").setRequired(true))
   )
-    .addSubcommand((sc) =>
-      sc
-        .setName("request-all")
-        .setDescription("Keyholder: request a check from all CagedSubs")
-        .addIntegerOption((o) =>
-          o
-            .setName("duration")
-            .setDescription(`Deadline in minutes (${cfg.MIN_DURATION_MIN}–${cfg.MAX_DURATION_MIN})`)
-            .setRequired(true)
-        )
-        .addStringOption((o) => o.setName("reason").setDescription("Reason/context").setRequired(false))
-    )
   .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
   .toJSON();
 
@@ -391,7 +379,14 @@ export async function handleCagecheck(inter: ChatInputCommandInteraction) {
       return;
     }
 
-    /* ===== /cagecheck request-all ===== */
+    // Kept as a defensive guard while Discord clients refresh the registered
+    // command definition. The bulk workflow is intentionally disabled.
+    if (sub === "request-all") {
+      await inter.editReply({ content: "The request-all function is temporarily disabled." });
+      return;
+    }
+
+    /* ===== Disabled legacy /cagecheck request-all implementation ===== */
     if (sub === "request-all") {
       try {
         requireRole(inter, cfg.KEYHOLDER_ROLE_ID, "Keyholder");

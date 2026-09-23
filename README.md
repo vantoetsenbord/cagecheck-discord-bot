@@ -16,7 +16,6 @@ Run `npm run register` whenever the slash-command definition changes.
 
 ## Commands
 - `/cagecheck request @sub duration reason` (Keymaster)
-- `/cagecheck request-all duration reason` (Keyholder, with confirmation)
 - `/cagecheck verify [photo]` (CagedSub)
 - `/cagecheck history @sub` (Keyholder)
 - `/cagecheck forgive @sub [count]` (Keyholder)
