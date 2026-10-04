@@ -11,6 +11,8 @@ function positiveNumber(name: string, fallback: number) {
 export const cfg = {
   KEYHOLDER_ROLE_ID: process.env.KEYHOLDER_ROLE_ID!,
   KEYMASTER_ROLE_ID: process.env.KEYMASTER_ROLE_ID!,
+  DOM_ROLE_ID: process.env.DOM_ROLE_ID?.trim() || "1447555295306842212",
+  ALPHA_ROLE_ID: process.env.ALPHA_ROLE_ID?.trim() || "1447556082758320178",
   CAGEDSUB_ROLE_ID: process.env.CAGEDSUB_ROLE_ID!,
   CAGECHECK_CHANNEL_ID: process.env.CAGECHECK_CHANNEL_ID!,
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID!,

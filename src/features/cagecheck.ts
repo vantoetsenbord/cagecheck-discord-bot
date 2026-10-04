@@ -35,6 +35,15 @@ function requireRole(inter: ChatInputCommandInteraction, roleId: string, roleNam
   }
 }
 
+function requireAnyRole(
+  inter: ChatInputCommandInteraction,
+  roles: Array<{ id: string; name: string }>
+) {
+  if (!roles.some((role) => memberHasRole(inter, role.id))) {
+    throw new Error(`You need one of these roles to use this command: **${roles.map((role) => role.name).join("**, **")}**.`);
+  }
+}
+
 function isInCageArea(inter: ChatInputCommandInteraction) {
   if (!inter.channel) return false;
   if (inter.channel.id === cfg.CAGECHECK_CHANNEL_ID) return true;
@@ -56,7 +65,7 @@ export const cagecheckCommand = new SlashCommandBuilder()
   .addSubcommand((sc) =>
     sc
       .setName("request")
-      .setDescription("Keyholder: request a check from a sub")
+      .setDescription("Dom, Alpha, or Keyholder: request a check from a sub")
       .addUserOption((o) =>
         o
           .setName("sub")
@@ -114,7 +123,11 @@ export async function handleCagecheck(inter: ChatInputCommandInteraction) {
     /* ===== /cagecheck request ===== */
     if (sub === "request") {
       try {
-        requireRole(inter, cfg.KEYMASTER_ROLE_ID, "Keymaster");
+        requireAnyRole(inter, [
+          { id: cfg.DOM_ROLE_ID, name: "DOM" },
+          { id: cfg.ALPHA_ROLE_ID, name: "Alpha" },
+          { id: cfg.KEYHOLDER_ROLE_ID, name: "Keyholder" },
+        ]);
       } catch (e: any) {
         await inter.editReply({ content: e.message });
         return;

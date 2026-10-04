@@ -15,7 +15,7 @@ Discord bot for role-based cage checks.
 Run `npm run register` whenever the slash-command definition changes.
 
 ## Commands
-- `/cagecheck request @sub duration reason` (Keymaster)
+- `/cagecheck request @sub duration reason` (DOM, Alpha, or Keyholder)
 - `/cagecheck verify [photo]` (CagedSub)
 - `/cagecheck history @sub` (Keyholder)
 - `/cagecheck forgive @sub [count]` (Keyholder)
